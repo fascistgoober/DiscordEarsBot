@@ -59,7 +59,7 @@ const SETTINGS_FILE = 'settings.json';
 
 let DISCORD_TOK = null;
 let WITAI_TOK = null; 
-let SPEECH_METHOD = 'vosk'; // witai, google, vosk
+let SPEECH_METHOD = 'witai'; // witai, google, vosk
 
 function loadConfig() {
     if (fs.existsSync(SETTINGS_FILE)) {
@@ -306,6 +306,25 @@ function speak_impl(voice_Connection, mapKey) {
         if (speaking.bitfield == 0 || user.bot) {
             return
         }
+
+        /* ---------------------
+         * TODO: Ignore based on rank
+         * ---------------------
+         */
+        // Ignore if user speaking isn't:
+        if((user.username.toLowerCase() != "kashire") &&
+           (user.username.toLowerCase() != "doctermoo") &&
+           (user.username.toLowerCase() != "silverion") &&
+           !(user.username.toLowerCase().startsWith("nebul")) &&
+           (user.username.toLowerCase() != "nebulè©¡") &&
+           (user.username.toLowerCase() != "larathyn") &&
+           (user.username.toLowerCase() != "ursari") &&
+           (user.username.toLowerCase() != "joli"))
+        {
+            console.log(`Ignoring ${user.username}.`);
+            return;
+        }
+        
         console.log(`I'm listening to ${user.username}`)
         // this creates a 16-bit signed PCM, stereo 48KHz stream
         const audioStream = voice_Connection.receiver.createStream(user, { mode: 'pcm' })
@@ -386,20 +405,40 @@ async function transcribe_witai(buffer) {
     }
 
     try {
-        console.log('transcribe_witai')
+        console.log('transcribe_witai');
         const extractSpeechIntent = util.promisify(witClient.extractSpeechIntent);
         var stream = Readable.from(buffer);
-        const contenttype = "audio/raw;encoding=signed-integer;bits=16;rate=48k;endian=little"
-        const output = await extractSpeechIntent(WITAI_TOK, stream, contenttype)
+        const contenttype = "audio/raw;encoding=signed-integer;bits=16;rate=48k;endian=little";
+        const output = await extractSpeechIntent(WITAI_TOK, stream, contenttype);
         witAI_lastcallTS = Math.floor(new Date());
-        console.log(output)
-        stream.destroy()
-        if (output && '_text' in output && output._text.length)
+        //console.log(output);
+        stream.destroy();
+
+        /* absurd, hacky nonsense inbound - kashire */
+        let arr = output.split('\n');
+        var MAGIC_NUMBER = 3; // This is where the finalized `text` is located.
+        let finalized_text = arr[arr.length - MAGIC_NUMBER].split(':').pop().slice(0, -1);
+        //console.log("[DEBUG-witai]: array-by-newline: " + finalized_text);
+        return finalized_text;
+       
+
+        // Below is the old thing that doesn't work now.
+        /*
+        // Error: TypeError: Cannot use 'in' operator to search for '_text'
+        // Below is the old condition:
+        //if (output && '_text' in output && output._text.length)
+        if (output && output.indexOf('_text') !== -1 && output._text.length)
             return output._text
-        if (output && 'text' in output && output.text.length)
+
+        // Error: TypeError: Cannot use 'in' operator to search for 'text'
+        // Below is the old condition:
+        //if (output && 'text' in output && output.text.length)
+       if (output && output.indexOf('text') !== -1 && output.text.length) 
             return output.text
         return output;
-    } catch (e) { console.log('transcribe_witai 851:' + e); console.log(e) }
+        */
+    } catch (e) { console.log('transcribe_witai 851: ' + e); console.log(e) }
+
 }
 
 // Google Speech API
